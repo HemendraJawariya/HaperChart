@@ -5,15 +5,18 @@ A full-stack real-time messaging app inspired by WhatsApp — built with React, 
 ---
 
 ## 📸 Screenshots
-
-![Chat UI](https://github.com/HemendraJawariya/HaperChart/blob/main/backend/public/Screenshot%20from%202025-08-12%2010-32-1.png)  
 *Modern chat interface with emoji reactions and image support*
-
+![Chat UI](https://github.com/HemendraJawariya/HaperChart/blob/main/backend/public/Screenshot%20from%202025-08-12%2010-32-1.png)  
+![Chat UI](https://github.com/HemendraJawariya/HaperChart/blob/main/backend/public/Screenshot%20from%202025-08-12%2010-32-3.png)
+![Chat UI](https://github.com/HemendraJawariya/HaperChart/blob/main/backend/public/Screenshot%20from%202025-08-12%2010-32-4.png)
+![Chat UI](https://github.com/HemendraJawariya/HaperChart/blob/main/backend/public/Screenshot%20from%202025-08-12%2010-33-0.png)
+![Chat UI](https://github.com/HemendraJawariya/HaperChart/blob/main/backend/public/Screenshot%20from%202025-08-12%2010-33-2.png)
+![Chat UI](https://github.com/HemendraJawariya/HaperChart/blob/main/backend/public/Screenshot%20from%202025-08-12%2010-33-3.png)
 ---
 
 ## ▶️ Demo
 
-[![YouTube Demo](https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/YouTube_icon_%282017%29.svg/512px-YouTube_icon_%282017%29.svg.png)](https://www.youtube.com/watch?v=your-demo-link)  
+[![YouTube Demo](https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/YouTube_icon_%282017%29.svg/512px-YouTube_icon_%282017%29.svg.png)](https://www.youtube.com/@HCoded)  
 Watch the full walkthrough on YouTube
 
 ---
