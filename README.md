@@ -1,6 +1,6 @@
 # 💬 HaperChat
 
-A full-stack real-time messaging app inspired by WhatsApp — built with React, Node.js, MongoDB, and Socket.IO. It supports emoji reactions, scoped message deletion, image sharing, and persistent conversations.
+A full-stack real-time messaging app inspired by Instagram — built with React, Node.js, MongoDB, and Socket.IO. It supports emoji reactions, scoped message deletion, image sharing, and persistent conversations.
 
 ---
 
