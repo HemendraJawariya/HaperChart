@@ -27,10 +27,10 @@ function SenderMessage({ message, onDelete, onReact }) {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  const confirmDelete = () => {
+  const confirmDelete = (scope = "me") => {
     setMenuOpen(false);
-    if (window.confirm("Delete this message?")) {
-      onDelete?.(message._id);
+    if (window.confirm(`Delete this message ${scope === "me" ? "for you" : "for everyone"}?`)) {
+      onDelete?.(message._id, scope);
     }
   };
 
@@ -42,7 +42,6 @@ function SenderMessage({ message, onDelete, onReact }) {
   const getDisplayName = (r) => {
     const currentId = userData?._id?.toString?.() || "";
     if (!r?.user) return "";
-    // r.user can be an ObjectId string or populated user object
     if (typeof r.user === "string") {
       return r.user === currentId ? "You" : "";
     }
@@ -120,7 +119,7 @@ function SenderMessage({ message, onDelete, onReact }) {
         />
       </div>
 
-      {/* Hamburger menu - visible on hover */}
+      {/* Hamburger Menu */}
       <div className="absolute top-[5px] right-[5px] z-[50]" ref={menuRef}>
         <button
           className="text-white opacity-0 group-hover:opacity-100 transition-opacity"
@@ -131,13 +130,20 @@ function SenderMessage({ message, onDelete, onReact }) {
         </button>
 
         {menuOpen && (
-          <div className="absolute right-0 mt-2 w-[160px] bg-black bg-opacity-90 backdrop-blur-md border border-gray-700 rounded-md shadow-xl z-[100]">
+          <div className="absolute right-0 mt-2 w-[180px] bg-black bg-opacity-90 backdrop-blur-md border border-gray-700 rounded-md shadow-xl z-[100]">
             <button
-              onClick={confirmDelete}
+              onClick={() => confirmDelete("me")}
               className="w-full flex items-center gap-2 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-gray-900 text-left"
             >
               <MdDelete className="w-[18px] h-[18px]" />
-              Delete
+              Delete for me
+            </button>
+            <button
+              onClick={() => confirmDelete("everyone")}
+              className="w-full flex items-center gap-2 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-gray-900 text-left"
+            >
+              <MdDelete className="w-[18px] h-[18px]" />
+              Delete for everyone
             </button>
           </div>
         )}

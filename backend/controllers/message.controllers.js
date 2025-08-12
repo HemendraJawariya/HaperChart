@@ -3,6 +3,8 @@ import Conversation from "../models/conversation.model.js";
 import Message from "../models/message.model.js";
 import { getSocketId, io } from "../socket.js";
 
+
+
 export const sendMessage=async (req,res)=>{
     try {
         const senderId=req.userId
@@ -45,20 +47,29 @@ return res.status(200).json(newMessage)
     }
 }
 
-export const getAllMessages=async (req,res)=>{
-    try {
-         const senderId=req.userId
-        const receiverId=req.params.receiverId
-        const conversation=await Conversation.findOne({
-            participants:{$all:[senderId,receiverId]}
-        }).populate("messages")
+export const getAllMessages = async (req, res) => {
+  try {
+    const senderId = req.userId;
+    const receiverId = req.params.receiverId;
 
-        return res.status(200).json(conversation?.messages)
+    const conversation = await Conversation.findOne({
+      participants: { $all: [senderId, receiverId] }
+    }).populate({
+      path: "messages",
+      populate: { path: "reactions.user", select: "userName name profileImage" }
+    });
 
-    } catch (error) {
-           return res.status(500).json({message:`get Message error ${error}`})
-    }
-}
+    const validMessages = (conversation?.messages || []).filter(
+      m => m && !m.deletedFor.includes(senderId)
+    );
+
+    return res.status(200).json(validMessages);
+  } catch (error) {
+    return res.status(500).json({ message: `get Message error ${error}` });
+  }
+};
+
+
 
 export const getPrevUserChats=async (req,res)=>{
     try {
@@ -86,57 +97,73 @@ export const getPrevUserChats=async (req,res)=>{
 
 
 
+
+
 export const deleteMessage = async (req, res) => {
   try {
-    const messageId = req.params.messageId;
+    const { messageId } = req.params;
+    const scope = req.query.scope || "everyone"; // "me" or "everyone"
     const userId = req.userId;
 
     const message = await Message.findById(messageId);
     if (!message) return res.status(404).json({ message: "Message not found" });
 
-    if (message.sender.toString() !== userId.toString()) {
-      return res.status(403).json({ message: "Unauthorized to delete" });
+    const isSender = String(message.sender) === String(userId);
+    const isReceiver = String(message.receiver) === String(userId);
+    if (!isSender && !isReceiver) return res.status(403).json({ message: "Not allowed" });
+
+    if (scope === "me") {
+      // Soft delete: hide for current user
+      if (!message.deletedFor.includes(userId)) {
+        message.deletedFor.push(userId);
+        await message.save();
+      }
+      return res.status(200).json({ message: "Deleted for you" });
     }
 
-    await Message.findByIdAndDelete(messageId);
-    await Conversation.updateOne(
-      { participants: { $all: [message.sender, message.receiver] } },
-      { $pull: { messages: messageId } }
-    );
+    if (scope === "everyone") {
+      if (!isSender) return res.status(403).json({ message: "Only sender can delete for everyone" });
 
-    const receiverSocketId = getSocketId(message.receiver);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("deleteMessage", { messageId });
+      await Message.findByIdAndDelete(messageId);
+      await Conversation.updateOne(
+        { participants: { $all: [message.sender, message.receiver] } },
+        { $pull: { messages: messageId } }
+      );
+
+      return res.status(200).json({ message: "Deleted for everyone" });
     }
 
-    res.status(200).json({ message: "Message deleted successfully" });
+    return res.status(400).json({ message: "Invalid scope" });
   } catch (error) {
-    res.status(500).json({ message: `Delete message error ${error}` });
+    return res.status(500).json({ message: `Delete error: ${error}` });
   }
 };
 
 // controllers/message.controllers.js
 export const reactToMessage = async (req, res) => {
-  try {
-    const { messageId } = req.params;
-    const { emoji } = req.body;
-    const userId = req.userId;
+  const { messageId } = req.params;
+  const { emoji } = req.body;
+  const userId = req.userId;
 
-    const message = await Message.findById(messageId);
-    if (!message) return res.status(404).json({ message: "Message not found" });
+  const message = await Message.findById(messageId);
+  if (!message) return res.status(404).json({ message: "Message not found" });
 
-    // Remove previous reaction from this user
-    message.reactions = message.reactions.filter(r => r.user.toString() !== userId);
+  const idx = message.reactions.findIndex(r => String(r.user) === String(userId));
+  if (idx > -1) {
+    if (message.reactions[idx].emoji === emoji) {
+      message.reactions.splice(idx, 1);
+    } else {
+      message.reactions[idx].emoji = emoji;
+      message.reactions[idx].timestamp = new Date();
+    }
+  } else {
     message.reactions.push({ emoji, user: userId });
-
-    await message.save();
-
-    // Optionally populate user data
-    await message.populate("reactions.user", "userName name");
-
-    return res.status(200).json({ messageId, reactions: message.reactions });
-  } catch (error) {
-    return res.status(500).json({ message: `React error: ${error}` });
   }
+
+  await message.save();
+  await message.populate("reactions.user", "userName name profileImage");
+
+  return res.status(200).json({ messageId, reactions: message.reactions });
 };
+
 

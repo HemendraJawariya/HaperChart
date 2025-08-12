@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import { useNavigate } from 'react-router-dom'
+import React, { useEffect, useRef, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { MdOutlineKeyboardBackspace } from "react-icons/md";
 import { LuImage } from "react-icons/lu";
 import { IoMdSend } from "react-icons/io";
-import dp from "../assets/dp.webp"
+import dp from "../assets/dp.webp";
 import SenderMessage from '../components/SenderMessage';
 import ReceiverMessage from '../components/ReceiverMessage';
 import axios from 'axios';
@@ -12,136 +12,146 @@ import { serverUrl } from '../App';
 import { setMessages } from '../redux/messageSlice';
 
 function MessageArea() {
-  const { selectedUser, messages } = useSelector(state => state.message)
-  const { userData } = useSelector(state => state.user)
-  const { socket } = useSelector(state => state.socket)
+  const { selectedUser, messages } = useSelector(state => state.message);
+  const { userData } = useSelector(state => state.user);
+  const { socket } = useSelector(state => state.socket);
 
-  const navigate = useNavigate()
-  const [input, setInput] = useState("")
-  const dispatch = useDispatch()
-  const imageInput = useRef()
-  const [frontendImage, setFrontendImage] = useState(null)
-  const [backendImage, setBackendImage] = useState(null)
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const imageInput = useRef();
+  const messagesRef = useRef(messages);
+  const [input, setInput] = useState("");
+  const [frontendImage, setFrontendImage] = useState(null);
+  const [backendImage, setBackendImage] = useState(null);
 
-  // Keep a ref of the latest messages to avoid stale closures in socket handlers
-  const messagesRef = useRef(messages)
-  useEffect(() => { messagesRef.current = messages }, [messages])
+  useEffect(() => { messagesRef.current = messages }, [messages]);
 
   const handleImage = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    setBackendImage(file)
-    setFrontendImage(URL.createObjectURL(file))
-  }
+    const file = e.target.files[0];
+    if (!file) return;
+    setBackendImage(file);
+    setFrontendImage(URL.createObjectURL(file));
+  };
 
   const handleSendMessage = async (e) => {
-    e.preventDefault()
-    if (!input && !backendImage) return
+    e.preventDefault();
+    if (!input && !backendImage) return;
     try {
-      const formData = new FormData()
-      formData.append("message", input)
-      if (backendImage) {
-        formData.append("image", backendImage)
-      }
-      const result = await axios.post(`${serverUrl}/api/message/send/${selectedUser._id}`, formData, { withCredentials: true })
-      dispatch(setMessages([...messagesRef.current, result.data]))
-      setInput("")
-      setBackendImage(null)
-      setFrontendImage(null)
-    } catch (error) {
-      console.log(error)
+      const formData = new FormData();
+      formData.append("message", input);
+      if (backendImage) formData.append("image", backendImage);
+
+      const res = await axios.post(`${serverUrl}/api/message/send/${selectedUser._id}`, formData, {
+        withCredentials: true
+      });
+
+      dispatch(setMessages([...messagesRef.current, { reactions: [], ...res.data }]));
+      setInput("");
+      setBackendImage(null);
+      setFrontendImage(null);
+    } catch (err) {
+      console.error("Send error", err);
     }
-  }
+  };
 
   const getAllMessages = async () => {
     try {
-      const result = await axios.get(`${serverUrl}/api/message/getAll/${selectedUser._id}`, { withCredentials: true })
-      // Ensure reactions array exists
-      const safe = (result.data || []).map(m => ({ reactions: [], ...m }))
-      dispatch(setMessages(safe))
-    } catch (error) {
-      console.log(error)
+      const res = await axios.get(`${serverUrl}/api/message/getAll/${selectedUser._id}`, {
+        withCredentials: true
+      });
+      dispatch(setMessages(res.data || []));
+    } catch (err) {
+      console.error("Fetch error", err);
     }
-  }
+  };
 
-  // React to a message
   const handleReact = async (messageId, emoji) => {
     try {
-      // Optimistic UI: update immediately
       const next = messagesRef.current.map(m => {
-        if (m._id !== messageId) return m
-        // Remove any previous reaction by this user, then add new one
+        if (m._id !== messageId) return m;
         const withoutMine = (m.reactions || []).filter(r => {
-          const uid = typeof r.user === 'object' ? r.user?._id : r.user
-          return uid !== userData._id
-        })
-        const myUserObj = { _id: userData._id, name: userData.name, userName: userData.userName }
-        return { ...m, reactions: [...withoutMine, { emoji, user: myUserObj }] }
-      })
-      dispatch(setMessages(next))
+          const uid = typeof r.user === 'object' ? r.user?._id : r.user;
+          return uid !== userData._id;
+        });
+        const myUserObj = { _id: userData._id, name: userData.name, userName: userData.userName };
+        return { ...m, reactions: [...withoutMine, { emoji, user: myUserObj }] };
+      });
+      dispatch(setMessages(next));
 
-      // Server update (will also broadcast socket)
-      await axios.post(`${serverUrl}/api/message/reaction/${messageId}`, { emoji }, { withCredentials: true })
-    } catch (error) {
-      console.log("Reaction error", error)
+      await axios.post(`${serverUrl}/api/message/reaction/${messageId}`, { emoji }, {
+        withCredentials: true
+      });
+    } catch (err) {
+      console.error("Reaction error", err);
     }
-  }
+  };
 
-  // Delete a message
-  const handleDelete = async (messageId) => {
+  const handleDelete = async (messageId, scope = "me") => {
     try {
-      // Optimistic removal
-      const next = messagesRef.current.filter(m => m._id !== messageId)
-      dispatch(setMessages(next))
+      await axios.delete(`${serverUrl}/api/message/delete/${messageId}?scope=${scope}`, {
+        withCredentials: true
+      });
 
-      await axios.delete(`${serverUrl}/api/message/${messageId}`, { withCredentials: true })
-    } catch (error) {
-      console.log("Delete error", error)
+      if (scope === "everyone") {
+        const updated = messagesRef.current.filter(m => m._id !== messageId);
+        dispatch(setMessages(updated));
+      } else {
+        await getAllMessages(); // refetch to apply backend filter
+      }
+    } catch (err) {
+      console.error("Delete error", err);
     }
-  }
+  };
 
   useEffect(() => {
-    getAllMessages()
-  }, [])
+    getAllMessages();
+  }, []);
 
-  // Socket listeners: new message, reaction updates, delete updates
   useEffect(() => {
-    if (!socket) return
+    if (!socket) return;
 
     const onNewMessage = (mess) => {
-      dispatch(setMessages([...messagesRef.current, { reactions: [], ...mess }]))
-    }
+      dispatch(setMessages([...messagesRef.current, { reactions: [], ...mess }]));
+    };
 
     const onMessageReaction = ({ messageId, reactions }) => {
-      const next = messagesRef.current.map(m => m._id === messageId ? { ...m, reactions } : m)
-      dispatch(setMessages(next))
-    }
+      const next = messagesRef.current.map(m =>
+        m._id === messageId ? { ...m, reactions } : m
+      );
+      dispatch(setMessages(next));
+    };
 
     const onDeleteMessage = ({ messageId }) => {
-      const next = messagesRef.current.filter(m => m._id !== messageId)
-      dispatch(setMessages(next))
-    }
+      const next = messagesRef.current.filter(m => m._id !== messageId);
+      dispatch(setMessages(next));
+    };
 
-    socket.on("newMessage", onNewMessage)
-    socket.on("messageReaction", onMessageReaction)
-    socket.on("deleteMessage", onDeleteMessage)
+    socket.on("newMessage", onNewMessage);
+    socket.on("messageReaction", onMessageReaction);
+    socket.on("deleteMessage", onDeleteMessage);
 
     return () => {
-      socket.off("newMessage", onNewMessage)
-      socket.off("messageReaction", onMessageReaction)
-      socket.off("deleteMessage", onDeleteMessage)
-    }
-  }, [socket, dispatch])
+      socket.off("newMessage", onNewMessage);
+      socket.off("messageReaction", onMessageReaction);
+      socket.off("deleteMessage", onDeleteMessage);
+    };
+  }, [socket, dispatch]);
 
   return (
     <div className='w-full h-[100vh] bg-black relative'>
       {/* Header */}
       <div className='w-full flex items-center gap-[15px] px-[20px] py-[10px] fixed top-0 z-[100] bg-black'>
         <div className='h-[80px] flex items-center gap-[20px] px-[20px]'>
-          <MdOutlineKeyboardBackspace className='text-white cursor-pointer w-[25px] h-[25px]' onClick={() => navigate(`/`)} />
+          <MdOutlineKeyboardBackspace
+            className='text-white cursor-pointer w-[25px] h-[25px]'
+            onClick={() => navigate(`/`)}
+          />
         </div>
 
-        <div className='w-[40px] h-[40px] border-2 border-black rounded-full cursor-pointer overflow-hidden' onClick={() => navigate(`/profile/${selectedUser.userName}`)}>
+        <div
+          className='w-[40px] h-[40px] border-2 border-black rounded-full cursor-pointer overflow-hidden'
+          onClick={() => navigate(`/profile/${selectedUser.userName}`)}
+        >
           <img src={selectedUser.profileImage || dp} alt="" className='w-full object-cover' />
         </div>
 
@@ -153,8 +163,8 @@ function MessageArea() {
 
       {/* Messages */}
       <div className='w-full h-[80%] pt-[100px] px-[40px] flex flex-col gap-[50px] overflow-auto bg-black'>
-        {messages && messages.map((mess) =>
-          mess.sender == userData._id ? (
+        {messages.map(mess =>
+          mess.sender === userData._id ? (
             <SenderMessage
               key={mess._id}
               message={mess}
@@ -176,7 +186,10 @@ function MessageArea() {
 
       {/* Composer */}
       <div className='w-full h-[80px] fixed bottom-0 flex justify-center items-center bg-black z-[100]'>
-        <form className='w-[90%] max-w-[800px] h-[80%] rounded-full bg-[#131616] flex items-center gap-[10px] px-[20px] relative' onSubmit={handleSendMessage}>
+        <form
+          className='w-[90%] max-w-[800px] h-[80%] rounded-full bg-[#131616] flex items-center gap-[10px] px-[20px] relative'
+          onSubmit={handleSendMessage}
+        >
           {frontendImage && (
             <div className='w-[100px] rounded-2xl h-[100px] absolute top-[-120px] right-[10px] overflow-hidden'>
               <img src={frontendImage} alt="" className='h-full object-cover' />
@@ -191,7 +204,9 @@ function MessageArea() {
             onChange={(e) => setInput(e.target.value)}
             value={input}
           />
-          <div onClick={() => imageInput.current?.click()}><LuImage className='w-[28px] h-[28px] text-white' /></div>
+          <div onClick={() => imageInput.current?.click()}>
+            <LuImage className='w-[28px] h-[28px] text-white' />
+          </div>
           {(input || frontendImage) && (
             <button className='w-[60px] h-[40px] rounded-full bg-gradient-to-br from-[#9500ff] to-[#ff0095] flex items-center justify-center cursor-pointer'>
               <IoMdSend className='w-[25px] h-[25px] text-white' />
@@ -199,11 +214,8 @@ function MessageArea() {
           )}
         </form>
       </div>
-
-
-
     </div>
-  )
+  );
 }
 
-export default MessageArea
+export default MessageArea;
