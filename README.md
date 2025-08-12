@@ -6,7 +6,7 @@ A full-stack real-time messaging app inspired by WhatsApp — built with React, 
 
 ## 📸 Screenshots
 
-![Chat UI](https://your-screenshot-url.com/chat-ui.png)  
+![Chat UI](https://github.com/HemendraJawariya/HaperChart/blob/main/backend/public/Screenshot%20from%202025-08-12%2010-32-1.png)  
 *Modern chat interface with emoji reactions and image support*
 
 ---
